@@ -1,14 +1,39 @@
 use midly::Smf;
 use midly::TrackEventKind;
+use std::env;
+use std::process::exit;
 use std::{collections::BTreeMap, fs};
 
 fn main() {
+    // Get the command-line arguments
+    let args: Vec<String> = env::args().collect();
+
+    if args.len() < 2 {
+        println!("Usage: midi2psx <input.mid> [output.dss]");
+        exit(1)
+    }
+
+    if args[1].ends_with(".mid") == false {
+        println!("Usage: midi2psx <input.mid> [output.dss]");
+        exit(1)
+    }
+
     // Load MIDI file
-    let bytes = fs::read(
-        "E:\\Network\\Sub Nivis OST Dynamic.mid",
-    )
-    .unwrap();
+    let bytes = match fs::read(
+        &args[1],
+    ) {
+        Ok(x) => x,
+        Err(_) => {println!("Failed to open file {}", args[1]); exit(2)},
+    };
     let smf = Smf::parse(&bytes).unwrap();
+
+    // Find output path
+    let out_path;
+    if args.len() < 3 {
+        out_path = args[1].replace(".mid", ".dss");
+    } else {
+        out_path = args[2].clone();
+    }
 
     // Read all the tracks and events, and squash them together into one track
     let mut event_map = BTreeMap::new();
@@ -99,13 +124,18 @@ fn main() {
 
     // TODO: write header
     let mut output = Vec::<u8>::new();
+    output.extend("FDDS".as_bytes());  // file magic
+    output.extend(1u32.to_le_bytes()); // number of sections, currently forced to 1
+    output.extend(0u32.to_le_bytes()); // section table offset, let's just define this to be the first thing after the header
+    output.extend(4u32.to_le_bytes()); // section data offset, always 4 because number of sections is forced to 1
+    output.extend(0u32.to_le_bytes()); // section table entry 1: starts at the start of the section data
 
     // Write sequence data to file
     for command in fdss_commands {
         output.extend(command.serialize());
     }
 
-    if let Err(err) = fs::write("output.dss", &output) {
+    if let Err(err) = fs::write(out_path, &output) {
         eprintln!("Error writing to file: {}", err);
     } else {
         println!("Data successfully written to file.");
@@ -133,20 +163,20 @@ pub enum FlanSeqCommand {
 impl FlanSeqCommand {
     fn serialize(self) -> Vec<u8> {
         match self {
-            FlanSeqCommand::ReleaseNote { channel, key } => return vec![0x00 | channel, key],
-            FlanSeqCommand::PlayNote { channel, key, velocity } =>  return vec![0x10 | channel, key, velocity],
-            FlanSeqCommand::SetChannelVolume { channel, volume } =>  return vec![0x20 | channel, volume],
-            FlanSeqCommand::SetChannelPanning { channel, panning } => return vec![0x30 | channel, panning],
-            FlanSeqCommand::SetChannelPitch { channel, pitch } => {
+            FlanSeqCommand::ReleaseNote         { channel, key } =>               return vec![0x00 | channel, key],
+            FlanSeqCommand::PlayNote            { channel, key, velocity } => return vec![0x10 | channel, key, velocity],
+            FlanSeqCommand::SetChannelVolume    { channel, volume } =>            return vec![0x20 | channel, volume],
+            FlanSeqCommand::SetChannelPanning   { channel, panning } =>           return vec![0x30 | channel, panning],
+            FlanSeqCommand::SetChannelPitch     { channel, pitch } => {
                 let pitch_bytes = pitch.to_le_bytes();
                 return vec![0x40 | channel, pitch_bytes[0], pitch_bytes[1]]
             },
-            FlanSeqCommand::SetChannelInstrument { channel, index } => return vec![0x50 | channel, index],
-            FlanSeqCommand::SetTempo { tempo } => return vec![0x80 | (tempo >> 8) as u8, (tempo & 0xFF) as u8],
-            FlanSeqCommand::WaitTicks { index_into_lut } => return vec![0xA0 + index_into_lut as u8],
-            FlanSeqCommand::SetTimeSignature { numerator, denominator } => return vec![0xFD, numerator, denominator],
-            FlanSeqCommand::SetLoopStart => return vec![0xFE],
-            FlanSeqCommand::JumpToLoopStart => return vec![0xFF],
+            FlanSeqCommand::SetChannelInstrument { channel, index } =>            return vec![0x50 | channel, index],
+            FlanSeqCommand::SetTempo            { tempo } =>                         return vec![0x80 | (tempo >> 8) as u8, (tempo & 0xFF) as u8],
+            FlanSeqCommand::WaitTicks { index_into_lut } =>                        return vec![0xA0 + index_into_lut as u8],
+            FlanSeqCommand::SetTimeSignature { numerator, denominator } =>        return vec![0xFD, numerator, denominator],
+            FlanSeqCommand::SetLoopStart =>                                               return vec![0xFE],
+            FlanSeqCommand::JumpToLoopStart =>                                            return vec![0xFF],
         }
     }
 }
