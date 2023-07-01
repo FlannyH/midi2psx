@@ -76,7 +76,14 @@ fn main() {
                     match message {
                         midly::MidiMessage::NoteOn{key, vel} => fdss_commands.push(FlanSeqCommand::PlayNote { channel: channel.into(), key: key.into(), velocity: vel.into() }),
                         midly::MidiMessage::NoteOff{key, vel: _} => fdss_commands.push(FlanSeqCommand::ReleaseNote { channel: channel.into(), key: key.into() }),
-                        midly::MidiMessage::ProgramChange{program} => fdss_commands.push(FlanSeqCommand::SetChannelInstrument { channel: channel.into(), index: program.into() }),
+                        midly::MidiMessage::ProgramChange{program} => {
+                            let channel = u8::from(channel);
+                            let index = match channel {
+                                10 => u8::from(program) + 128,
+                                _ => u8::from(program),
+                            };
+                            fdss_commands.push(FlanSeqCommand::SetChannelInstrument { channel: channel, index: index })
+                        },
                         midly::MidiMessage::PitchBend {bend} => {
                             let pitch_bend_range_cents = (pitch_bend_range_coarse as f32 * 100.0) + (pitch_bend_range_fine as f32 * 1.0);
                             let bend_value_normalized = bend.as_f32();
