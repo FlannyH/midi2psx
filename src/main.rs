@@ -79,7 +79,7 @@ fn main() {
                         midly::MidiMessage::ProgramChange{program} => {
                             let channel = u8::from(channel);
                             let index = match channel {
-                                10 => u8::from(program) + 128,
+                                9 => u8::from(program) + 128,
                                 _ => u8::from(program),
                             };
                             fdss_commands.push(FlanSeqCommand::SetChannelInstrument { channel: channel, index: index })
