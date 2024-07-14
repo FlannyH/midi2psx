@@ -39,7 +39,6 @@ fn main() {
     let mut event_map = BTreeMap::new();
 
     for (i, track) in smf.tracks.iter().enumerate() {
-        println!("track {} has {} events", i, track.len());
         let mut time = 0;
         for event in track {
             time += event.delta.as_int();
