@@ -38,7 +38,7 @@ fn main() {
     // Read all the tracks and events, and squash them together into one track
     let mut event_map = BTreeMap::new();
 
-    for (i, track) in smf.tracks.iter().enumerate() {
+    for (_, track) in smf.tracks.iter().enumerate() {
         let mut time = 0;
         for event in track {
             time += event.delta.as_int();
@@ -112,10 +112,15 @@ fn main() {
                 TrackEventKind::Meta(message) => {
                     match message {
                         midly::MetaMessage::Tempo(tempo) => {
-                            let ms_per_quarter_note = tempo.as_int() as f32;
-                            let bpm_f32 = 60_000_000.0 / ms_per_quarter_note;
-                            let bpm_command = (bpm_f32 * 8.0) as u16;
-                            fdss_commands.push(FlanSeqCommand::SetTempo { tempo: bpm_command })
+                            let ticks_per_quarter_note = match smf.header.timing {
+                                midly::Timing::Metrical(ticks_per_quarter_note) => ticks_per_quarter_note.as_int() as f64,
+                                midly::Timing::Timecode(..) => panic!("Attempted tempo change with fixed timecode for time division!")
+                            };
+                            let microseconds_per_quarter_note = tempo.as_int() as f64;
+                            let microseconds_per_tick = microseconds_per_quarter_note / ticks_per_quarter_note;
+                            let tick_length_multiplier = 49152.0;
+                            let raw_value = (microseconds_per_tick * tick_length_multiplier).round().clamp(0.0, 4095.0);
+                            fdss_commands.push(FlanSeqCommand::SetTempo { tempo: raw_value as u16 })
                         },
                         midly::MetaMessage::TimeSignature(num, denom, _ticks_per_click, _note32_per_midi_quarter) => {
                             fdss_commands.push(FlanSeqCommand::SetTimeSignature { numerator: num, denominator: 1 << denom })
