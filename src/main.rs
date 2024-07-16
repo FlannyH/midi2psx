@@ -118,8 +118,9 @@ fn main() {
                             };
                             let microseconds_per_quarter_note = tempo.as_int() as f64;
                             let microseconds_per_tick = microseconds_per_quarter_note / ticks_per_quarter_note;
+                            let seconds_per_tick = microseconds_per_tick /  1_000_000.0;
                             let tick_length_multiplier = 49152.0;
-                            let raw_value = (microseconds_per_tick * tick_length_multiplier).round().clamp(0.0, 4095.0);
+                            let raw_value = (seconds_per_tick * tick_length_multiplier).round().clamp(0.0, 4095.0);
                             fdss_commands.push(FlanSeqCommand::SetTempo { tempo: raw_value as u16 })
                         },
                         midly::MetaMessage::TimeSignature(num, denom, _ticks_per_click, _note32_per_midi_quarter) => {
