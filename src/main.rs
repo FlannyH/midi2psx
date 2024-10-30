@@ -136,7 +136,7 @@ fn main() {
 
     // TODO: write header
     let mut output = Vec::<u8>::new();
-    output.extend("FDDS".as_bytes());  // file magic
+    output.extend("FDSS".as_bytes());  // file magic
     output.extend(1u32.to_le_bytes()); // number of sections, currently forced to 1
     output.extend(0u32.to_le_bytes()); // section table offset, let's just define this to be the first thing after the header
     output.extend(4u32.to_le_bytes()); // section data offset, always 4 because number of sections is forced to 1
