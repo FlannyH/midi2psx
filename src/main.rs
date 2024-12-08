@@ -1,3 +1,5 @@
+use log::debug;
+use log::error;
 use midly::Smf;
 use midly::TrackEventKind;
 use std::env;
@@ -7,9 +9,10 @@ use std::{collections::BTreeMap, fs};
 fn main() {
     // Get the command-line arguments
     let args: Vec<String> = env::args().collect();
+    let mut verbose = false; 
 
-    if args.len() < 2 {
-        println!("Usage: midi2psx <input.mid> [output.dss]");
+    if args.len() < 2 || args.len() > 4 {
+        println!("Usage: midi2psx <input.mid> [output.dss] [--verbose]");
         exit(1)
     }
 
@@ -18,12 +21,24 @@ fn main() {
         exit(1)
     }
 
+    if args.len() == 4 {
+        if args[3] == "--verbose" {
+            verbose = true;
+        }
+    }
+
+    if verbose {
+        env_logger::Builder::new().filter_level(log::LevelFilter::Debug).init();
+    } else {
+        env_logger::Builder::new().filter_level(log::LevelFilter::Info).init();
+    }
+
     // Load MIDI file
     let bytes = match fs::read(
         &args[1],
     ) {
         Ok(x) => x,
-        Err(_) => {println!("Failed to open file {}", args[1]); exit(2)},
+        Err(_) => {error!("Failed to open file {}", args[1]); exit(2)},
     };
     let smf = Smf::parse(&bytes).unwrap();
 
@@ -104,9 +119,9 @@ fn main() {
                                     pitch_bend_range_fine = value.into()
                                 }
                             }
-                            _ => println!("Unsupported controller {controller}, value {value}"),
+                            _ => debug!("Unsupported controller {controller}, value {value}"),
                         }
-                        _ => println!("Unsupported event {message:?}"),
+                        _ => debug!("Unsupported event {message:?}"),
                     }
                 },
                 TrackEventKind::Meta(message) => {
@@ -126,10 +141,10 @@ fn main() {
                         midly::MetaMessage::TimeSignature(num, denom, _ticks_per_click, _note32_per_midi_quarter) => {
                             fdss_commands.push(FlanSeqCommand::SetTimeSignature { numerator: num, denominator: 1 << denom })
                         },
-                        _ => println!("Unsupported meta event {message:?}"),
+                        _ => debug!("Unsupported meta event {message:?}"),
                     }
                 },
-                _ => println!("Unsupported event: {event:?}"),
+                _ => debug!("Unsupported event: {event:?}"),
             }
         }
     }
@@ -148,9 +163,9 @@ fn main() {
     }
 
     if let Err(err) = fs::write(out_path, &output) {
-        eprintln!("Error writing to file: {}", err);
+        error!("Error writing to file: {}", err);
     } else {
-        println!("Data successfully written to file.");
+        debug!("Data successfully written to file.");
     }
 }
 
